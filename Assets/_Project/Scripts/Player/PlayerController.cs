@@ -3,12 +3,14 @@ using UnityEngine.AI;
 
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField] private NavMeshAgent agent;
+    [SerializeField] private LayerMask groundMask;
 
+    private NavMeshAgent agent;
     private Camera mainCamera;
 
     private void Awake()
     {
+        agent = GetComponent<NavMeshAgent>();
         mainCamera = Camera.main;
     }
 
@@ -22,7 +24,8 @@ public class PlayerController : MonoBehaviour
         if (!Input.GetMouseButtonDown(0)) return;
 
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit))
+
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, groundMask))
         {
             agent.SetDestination(hit.point);
         }
