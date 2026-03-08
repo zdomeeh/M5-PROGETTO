@@ -3,5 +3,6 @@ public enum EnemyState
     Idle,
     Patrol,
     Chase,
-    Search
+    Search,
+    Stunned
 }

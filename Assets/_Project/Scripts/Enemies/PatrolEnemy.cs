@@ -1,28 +1,85 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class PatrolEnemy : EnemyController
 {
-    [SerializeField] private Transform[] patrolPoints;
-    private int currentIndex;
+    [Header("Patrol Settings")]
+    public Transform[] patrolPoints;
+    public float waitTimeAtPoint = 0.5f;
+    public float rotationSpeed = 5f;
 
-    protected override void SetInitialState()
+    private int currentPatrolIndex = 0;
+    private bool waiting = false;
+
+    void Start()
     {
-        if (patrolPoints.Length == 0) return;
-        currentIndex = 0;
-        ChangeState(EnemyState.Patrol);
-        agent.isStopped = false;              // Attiva il movimento
-        agent.SetDestination(patrolPoints[0].position);
+        if (patrolPoints.Length == 0)
+        {
+            Debug.LogError("Patrol points non assegnati!");
+            return;
+        }
+
+        agent.isStopped = false;
+        agent.SetDestination(patrolPoints[currentPatrolIndex].position);
     }
 
-    protected override void UpdatePatrol()
+    protected override void Update()
     {
-        agent.isStopped = false;               // Assicurati che sia abilitato
-        if (patrolPoints.Length == 0) return;
+        if (currentState == EnemyState.Stunned) return; // fermo se stunnato
 
-        if (!agent.pathPending && agent.remainingDistance < 0.5f)
+        base.Update();
+
+        if (waiting || patrolPoints.Length == 0) return;
+
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
         {
-            currentIndex = (currentIndex + 1) % patrolPoints.Length;
-            agent.SetDestination(patrolPoints[currentIndex].position);
+            StartCoroutine(MoveToNextPoint());
         }
+
+        RotateTowardsMovement();
+    }
+
+    void RotateTowardsMovement()
+    {
+        if (!agent.hasPath) return;
+
+        Vector3 direction = (agent.steeringTarget - transform.position).normalized;
+        if (direction == Vector3.zero) return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+    }
+
+    IEnumerator MoveToNextPoint()
+    {
+        waiting = true;
+        agent.isStopped = true;
+
+        yield return new WaitForSeconds(waitTimeAtPoint);
+
+        currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
+        agent.SetDestination(patrolPoints[currentPatrolIndex].position);
+
+        agent.isStopped = false;
+        waiting = false;
+    }
+
+    protected override void StartChase()
+    {
+        base.StartChase();
+    }
+
+    void OnDrawGizmos()
+    {
+        if (eye == null) return;
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawRay(eye.position, eye.forward * viewDistance);
+
+        Vector3 leftDir = Quaternion.Euler(0, -viewAngle / 2, 0) * eye.forward;
+        Vector3 rightDir = Quaternion.Euler(0, viewAngle / 2, 0) * eye.forward;
+        Gizmos.DrawRay(eye.position, leftDir * viewDistance);
+        Gizmos.DrawRay(eye.position, rightDir * viewDistance);
     }
 }

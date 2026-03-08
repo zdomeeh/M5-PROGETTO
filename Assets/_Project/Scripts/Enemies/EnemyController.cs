@@ -1,151 +1,94 @@
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections;
 
 public class EnemyController : MonoBehaviour
 {
-    [Header("Vision Settings")]
+    [Header("Vision")]
+    public Transform eye;
     public float viewDistance = 8f;
-    [Range(0, 180)]
     public float viewAngle = 90f;
     public LayerMask obstacleMask;
-    public Transform eye;
 
-    [Header("Movement Settings")]
-    public float rotationSpeed = 5f;
+    [Header("Movement")]
+    public NavMeshAgent agent;
+    public float chaseSpeed = 3.5f;
 
-    protected NavMeshAgent agent;
-    protected Transform player;
-
-    protected EnemyState currentState;
+    [Header("State")]
+    public EnemyState currentState = EnemyState.Idle;
     protected EnemyState previousState;
-    protected Vector3 lastKnownPlayerPosition;
+
+    protected Transform player;
+    protected Vector3 lastKnownPlayerPos;
 
     protected virtual void Awake()
     {
-        agent = GetComponent<NavMeshAgent>();
+        if (agent == null)
+            agent = GetComponent<NavMeshAgent>();
 
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-            player = playerObj.transform;
-    }
-
-    protected virtual void Start()
-    {
-        SetInitialState();
+        GameObject p = GameObject.FindGameObjectWithTag("Player");
+        if (p != null)
+            player = p.transform;
     }
 
     protected virtual void Update()
     {
-        if (player == null) return;
+        if (player == null || eye == null) return;
 
-        UpdateState();
+        // Non fare nulla se stunnato
+        if (currentState == EnemyState.Stunned) return;
 
-        // Controllo se il nemico può vedere il player
-        if (currentState != EnemyState.Chase && CanSeePlayer())
+        if (CanSeePlayer())
         {
-            lastKnownPlayerPosition = player.position;
-            ChangeState(EnemyState.Chase);
+            lastKnownPlayerPos = player.position;
+            StartChase();
         }
     }
 
-    protected virtual void SetInitialState()
+    protected virtual void StartChase()
     {
-        ChangeState(EnemyState.Idle);
-    }
-
-    protected void ChangeState(EnemyState newState)
-    {
-        if (currentState == newState) return;
-
-        OnStateExit(currentState);
-
-        previousState = currentState;
-        currentState = newState;
-
-        OnStateEnter(newState);
-    }
-
-    protected virtual void UpdateState()
-    {
-        switch (currentState)
-        {
-            case EnemyState.Idle: UpdateIdle(); break;
-            case EnemyState.Patrol: UpdatePatrol(); break;
-            case EnemyState.Chase: UpdateChase(); break;
-            case EnemyState.Search: UpdateSearch(); break;
-        }
-    }
-
-    // Stati base (da sovrascrivere nei figli)
-    protected virtual void UpdateIdle()
-    {
-        agent.isStopped = true;
-    }
-
-    protected virtual void UpdatePatrol()
-    {
-        // In PatrolEnemy verrà sovrascritto
-        agent.isStopped = false;
-    }
-
-    protected virtual void UpdateChase()
-    {
-        if (player == null) return;
+        if (currentState != EnemyState.Chase)
+            currentState = EnemyState.Chase;
 
         agent.isStopped = false;
+        agent.speed = chaseSpeed;
         agent.SetDestination(player.position);
-
-        // Se perde la vista, passa a Search dopo 1 secondo
-        if (!CanSeePlayer())
-            Invoke(nameof(StartSearch), 1f);
     }
 
-    private void StartSearch()
-    {
-        if (currentState == EnemyState.Chase)
-            ChangeState(EnemyState.Search);
-    }
-
-    protected virtual void UpdateSearch()
-    {
-        agent.isStopped = false;
-        agent.SetDestination(lastKnownPlayerPosition);
-
-        if (!agent.pathPending && agent.remainingDistance < 0.5f)
-            ChangeState(previousState); // torna allo stato precedente
-    }
-
-    protected virtual void OnStateEnter(EnemyState state)
-    {
-        switch (state)
-        {
-            case EnemyState.Chase:
-                agent.isStopped = false;
-                break;
-            case EnemyState.Search:
-                agent.isStopped = false;
-                agent.SetDestination(lastKnownPlayerPosition);
-                break;
-        }
-    }
-
-    protected virtual void OnStateExit(EnemyState state) { }
-
-    // Controlla se il nemico può vedere il player
     protected bool CanSeePlayer()
     {
-        if (player == null || eye == null) return false;
+        Vector3 dir = player.position - eye.position;
+        float distance = dir.magnitude;
 
-        Vector3 dirToPlayer = player.position - eye.position;
-        if (dirToPlayer.magnitude > viewDistance) return false;
+        if (distance > viewDistance) return false;
 
-        float angle = Vector3.Angle(eye.forward, dirToPlayer);
+        float angle = Vector3.Angle(eye.forward, dir);
         if (angle > viewAngle * 0.5f) return false;
 
-        // Raycast per ostacoli
-        if (Physics.Raycast(eye.position, dirToPlayer.normalized, out RaycastHit hit, viewDistance, ~obstacleMask))
-            return hit.transform == player;
+        if (Physics.Raycast(eye.position, dir.normalized, out RaycastHit hit, viewDistance, ~obstacleMask))
+        {
+            if (hit.transform == player)
+                return true;
+        }
 
         return false;
+    }
+
+    // ----------------- NUOVO: Stun -----------------
+    public void ApplyStun(float duration)
+    {
+        if (currentState == EnemyState.Stunned) return;
+
+        previousState = currentState;
+        currentState = EnemyState.Stunned;
+        StartCoroutine(StunCoroutine(duration));
+    }
+
+    IEnumerator StunCoroutine(float duration)
+    {
+        agent.isStopped = true;
+        yield return new WaitForSeconds(duration);
+        currentState = previousState;
+        agent.isStopped = false;
     }
 }
