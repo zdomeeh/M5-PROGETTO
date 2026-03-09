@@ -1,10 +1,7 @@
-﻿using System.Collections;
-using UnityEngine;
-using UnityEngine.AI;
+﻿using UnityEngine;
 
 public class StaticEnemy : EnemyController
 {
-    [Header("Rotation")]
     public float rotationAngle = 90f;
     public float rotationInterval = 2f;
 
@@ -19,20 +16,20 @@ public class StaticEnemy : EnemyController
 
     protected override void Awake()
     {
-        base.Awake();
-        homePosition = transform.position;
-        homeRotation = transform.rotation;
+        base.Awake();                        // Awake della classe base EnemyController
+        homePosition = transform.position;   // salva posizione iniziale
+        homeRotation = transform.rotation;   // salva rotazione iniziale
         player = GameObject.FindGameObjectWithTag("Player")?.transform;
-        currentState = EnemyState.Idle;
+        currentState = EnemyState.Idle;      // stato base: Idle
     }
 
     protected override void Update()
     {
         if (currentState == EnemyState.Stunned) return; // blocco completo se stunnato
-
-        HandleState();
+        HandleState();                                    // gestisci comportamenti in base allo stato
     }
 
+    // Gestisce i diversi comportamenti in base allo stato
     private void HandleState()
     {
         switch (currentStaticState)
@@ -41,11 +38,12 @@ public class StaticEnemy : EnemyController
                 rotationTimer += Time.deltaTime;
                 if (rotationTimer >= rotationInterval)
                 {
-                    transform.Rotate(Vector3.up, rotationAngle);
+                    transform.Rotate(Vector3.up, rotationAngle); // ruota di rotationAngle gradi
                     rotationTimer = 0f;
                 }
-                agent.isStopped = true;
+                agent.isStopped = true;  // nemico fermo
 
+                // Se vede il player, passa allo stato Chase
                 if (CanSeePlayer())
                 {
                     currentStaticState = State.Chase;
@@ -58,10 +56,12 @@ public class StaticEnemy : EnemyController
             case State.Chase:
                 if (CanSeePlayer())
                 {
+                    // Insegue il player
                     agent.SetDestination(player.position);
                 }
                 else
                 {
+                    // Non vede più il player, torna a casa
                     currentStaticState = State.ReturnHome;
                     agent.SetDestination(homePosition);
                 }
@@ -70,6 +70,7 @@ public class StaticEnemy : EnemyController
             case State.ReturnHome:
                 agent.SetDestination(homePosition);
 
+                // Quando arriva a casa, ripristina posizione e rotazione iniziale
                 if (!agent.pathPending && agent.remainingDistance < 0.2f)
                 {
                     transform.position = homePosition;
@@ -81,9 +82,10 @@ public class StaticEnemy : EnemyController
         }
     }
 
+    // Controlla se il player è visibile (qui distanza semplice)
     private bool CanSeePlayer()
     {
         if (player == null) return false;
-        return Vector3.Distance(player.position, transform.position) < 8f; // distanza semplice
+        return Vector3.Distance(player.position, transform.position) < 8f;
     }
 }
