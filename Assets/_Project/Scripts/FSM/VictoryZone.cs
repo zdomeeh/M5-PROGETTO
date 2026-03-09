@@ -13,22 +13,23 @@ public class VictoryZone : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (triggered) return;
+        if (triggered) return;          // Se già attivato, non fare nulla
 
-        if (other.CompareTag("Player"))
+        if (other.CompareTag("Player")) // Controlla se il player entra nella zona
         {
             triggered = true;
 
             if (victoryPanel != null)
-                victoryPanel.SetActive(true);
+                victoryPanel.SetActive(true); // Mostra il pannello di vittoria
 
-            StartCoroutine(ReturnToMainMenu());
+            StartCoroutine(ReturnToMainMenu()); // Avvia coroutine per tornare al menu
         }
     }
 
+    // Coroutine che aspetta un po' e poi carica il menu principale
     private IEnumerator ReturnToMainMenu()
     {
         yield return new WaitForSeconds(delayBeforeMainMenu);
-        SceneManager.LoadScene("MainMenu"); // sostituisci con il nome della tua scena menu
+        SceneManager.LoadScene("MainMenu"); // Sostituisci con il nome della tua scena menu
     }
 }
