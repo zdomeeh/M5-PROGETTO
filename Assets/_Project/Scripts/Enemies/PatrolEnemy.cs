@@ -12,35 +12,27 @@ public class PatrolEnemy : EnemyController
     private int currentPatrolIndex = 0;
     private bool waiting = false;
 
-    void Start()
+    protected override void Awake()
     {
-        if (patrolPoints.Length == 0)
-        {
-            Debug.LogError("Patrol points non assegnati!");
-            return;
-        }
-
-        agent.isStopped = false;
-        agent.SetDestination(patrolPoints[currentPatrolIndex].position);
+        base.Awake();
+        if (patrolPoints.Length > 0)
+            agent.SetDestination(patrolPoints[currentPatrolIndex].position);
+        currentState = EnemyState.Patrol;
     }
 
     protected override void Update()
     {
-        if (currentState == EnemyState.Stunned) return; // fermo se stunnato
+        if (currentState == EnemyState.Stunned) return; // blocco completo se stunnato
 
-        base.Update();
+        if (patrolPoints.Length == 0) return;
 
-        if (waiting || patrolPoints.Length == 0) return;
-
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
-        {
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance && !waiting)
             StartCoroutine(MoveToNextPoint());
-        }
 
         RotateTowardsMovement();
     }
 
-    void RotateTowardsMovement()
+    private void RotateTowardsMovement()
     {
         if (!agent.hasPath) return;
 
@@ -51,35 +43,18 @@ public class PatrolEnemy : EnemyController
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
     }
 
-    IEnumerator MoveToNextPoint()
+    private IEnumerator MoveToNextPoint()
     {
         waiting = true;
-        agent.isStopped = true;
 
+        agent.SetDestination(transform.position); // ferma il movimento
         yield return new WaitForSeconds(waitTimeAtPoint);
+
+        if (currentState == EnemyState.Stunned) { waiting = false; yield break; } // blocco se stunnato
 
         currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
         agent.SetDestination(patrolPoints[currentPatrolIndex].position);
 
-        agent.isStopped = false;
         waiting = false;
-    }
-
-    protected override void StartChase()
-    {
-        base.StartChase();
-    }
-
-    void OnDrawGizmos()
-    {
-        if (eye == null) return;
-
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawRay(eye.position, eye.forward * viewDistance);
-
-        Vector3 leftDir = Quaternion.Euler(0, -viewAngle / 2, 0) * eye.forward;
-        Vector3 rightDir = Quaternion.Euler(0, viewAngle / 2, 0) * eye.forward;
-        Gizmos.DrawRay(eye.position, leftDir * viewDistance);
-        Gizmos.DrawRay(eye.position, rightDir * viewDistance);
     }
 }

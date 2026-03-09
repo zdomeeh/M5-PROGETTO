@@ -1,94 +1,79 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
 
 public class EnemyController : MonoBehaviour
 {
-    [Header("Vision")]
-    public Transform eye;
-    public float viewDistance = 8f;
-    public float viewAngle = 90f;
-    public LayerMask obstacleMask;
-
     [Header("Movement")]
     public NavMeshAgent agent;
-    public float chaseSpeed = 3.5f;
 
     [Header("State")]
     public EnemyState currentState = EnemyState.Idle;
     protected EnemyState previousState;
 
-    protected Transform player;
-    protected Vector3 lastKnownPlayerPos;
+    [Header("Stun")]
+    protected Renderer rend;
 
     protected virtual void Awake()
     {
         if (agent == null)
             agent = GetComponent<NavMeshAgent>();
 
-        GameObject p = GameObject.FindGameObjectWithTag("Player");
-        if (p != null)
-            player = p.transform;
+        rend = GetComponent<Renderer>();
+        if (rend == null)
+            rend = GetComponentInChildren<Renderer>();
     }
 
     protected virtual void Update()
     {
-        if (player == null || eye == null) return;
-
-        // Non fare nulla se stunnato
-        if (currentState == EnemyState.Stunned) return;
-
-        if (CanSeePlayer())
+        // Se stunnato, blocca Update base
+        if (currentState == EnemyState.Stunned)
         {
-            lastKnownPlayerPos = player.position;
-            StartChase();
+            agent.isStopped = true;
+            return;
         }
     }
 
-    protected virtual void StartChase()
-    {
-        if (currentState != EnemyState.Chase)
-            currentState = EnemyState.Chase;
-
-        agent.isStopped = false;
-        agent.speed = chaseSpeed;
-        agent.SetDestination(player.position);
-    }
-
-    protected bool CanSeePlayer()
-    {
-        Vector3 dir = player.position - eye.position;
-        float distance = dir.magnitude;
-
-        if (distance > viewDistance) return false;
-
-        float angle = Vector3.Angle(eye.forward, dir);
-        if (angle > viewAngle * 0.5f) return false;
-
-        if (Physics.Raycast(eye.position, dir.normalized, out RaycastHit hit, viewDistance, ~obstacleMask))
-        {
-            if (hit.transform == player)
-                return true;
-        }
-
-        return false;
-    }
-
-    // ----------------- NUOVO: Stun -----------------
-    public void ApplyStun(float duration)
+    public virtual void ApplyStun(float duration)
     {
         if (currentState == EnemyState.Stunned) return;
+
+        Debug.Log("STUN APPLICATO su " + gameObject.name);
 
         previousState = currentState;
         currentState = EnemyState.Stunned;
+
+        // Blocca agente
+        if (agent != null)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            agent.ResetPath();
+        }
+
+        // Cambia colore
+        if (rend != null)
+            rend.material.color = Color.blue;
+
         StartCoroutine(StunCoroutine(duration));
     }
 
-    IEnumerator StunCoroutine(float duration)
+    private IEnumerator StunCoroutine(float duration)
     {
-        agent.isStopped = true;
         yield return new WaitForSeconds(duration);
+
+        // Ripristina stato precedente
         currentState = previousState;
-        agent.isStopped = false;
+
+        if (agent != null)
+            agent.isStopped = false;
+
+        if (rend != null)
+            rend.material.color = Color.white;
+    }
+
+    public bool IsStunned()
+    {
+        return currentState == EnemyState.Stunned;
     }
 }

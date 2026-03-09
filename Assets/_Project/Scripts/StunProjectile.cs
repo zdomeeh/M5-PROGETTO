@@ -8,20 +8,27 @@ public class StunProjectile : MonoBehaviour
     public float stunDuration = 3f;
     public float lifeTime = 5f;
 
+    private Rigidbody rb;
+
+    void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        if (rb == null)
+            Debug.LogError("StunProjectile: manca Rigidbody!");
+    }
+
     void Start()
     {
         Destroy(gameObject, lifeTime);
+        if (rb != null)
+            rb.velocity = transform.forward * speed;
     }
 
-    void Update()
+    private void OnTriggerEnter(Collider other)
     {
-        transform.Translate(Vector3.forward * speed * Time.deltaTime);
-    }
+        if (other.CompareTag("Player")) return;
 
-    void OnTriggerEnter(Collider other)
-    {
         EnemyController enemy = other.GetComponent<EnemyController>();
-
         if (enemy != null)
         {
             enemy.ApplyStun(stunDuration);

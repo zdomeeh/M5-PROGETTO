@@ -1,27 +1,19 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerStunGun : MonoBehaviour
 {
-    [Header("Stun Settings")]
-    public float stunDuration = 3f;      // Durata dello stun sul nemico
-    public float stunRange = 8f;         // Distanza massima dello stun
-    public LayerMask enemyMask;          // Layer dei nemici
+    public GameObject stunProjectilePrefab;
+    public Transform firePoint;
+    public float fireCooldown = 1f;
 
-    [Header("Cooldown")]
-    public float fireCooldown = 1f;      // Tempo tra uno stun e l'altro
     private float timer = 0f;
-
-    [Header("References")]
-    public Transform firePoint;          // Punto da cui parte il "raggio"
 
     void Update()
     {
-        // Aggiorna cooldown
         timer -= Time.deltaTime;
 
-        // Tasto E per stunnare
         if (Input.GetKeyDown(KeyCode.R) && timer <= 0f)
         {
             ShootStun();
@@ -31,20 +23,19 @@ public class PlayerStunGun : MonoBehaviour
 
     void ShootStun()
     {
-        // Raycast dal FirePoint in avanti
-        Ray ray = new Ray(firePoint.position, firePoint.forward);
-
-        if (Physics.Raycast(ray, out RaycastHit hit, stunRange, enemyMask))
+        if (stunProjectilePrefab == null || firePoint == null)
         {
-            EnemyController enemy = hit.collider.GetComponent<EnemyController>();
-            if (enemy != null)
-            {
-                enemy.ApplyStun(stunDuration);
-                Debug.Log("Nemico stunnato: " + enemy.name);
-            }
+            Debug.LogError("PlayerStunGun: assegna prefab e firePoint!");
+            return;
         }
 
-        // Effetto visivo debug (opzionale)
-        Debug.DrawRay(firePoint.position, firePoint.forward * stunRange, Color.cyan, 0.5f);
+        Vector3 spawnPos = firePoint.position + firePoint.forward * 1f;
+        GameObject projectile = Instantiate(stunProjectilePrefab, spawnPos, firePoint.rotation);
+
+        // Ignora collisione con il player
+        Collider projectileCollider = projectile.GetComponent<Collider>();
+        Collider playerCollider = GetComponent<Collider>();
+        if (projectileCollider != null && playerCollider != null)
+            Physics.IgnoreCollision(projectileCollider, playerCollider);
     }
 }

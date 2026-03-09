@@ -14,90 +14,76 @@ public class StaticEnemy : EnemyController
 
     private enum State { IdleRotate, Chase, ReturnHome }
     private State currentStaticState = State.IdleRotate;
-    private State previousStaticState;
+
+    private Transform player;
 
     protected override void Awake()
     {
         base.Awake();
         homePosition = transform.position;
         homeRotation = transform.rotation;
+        player = GameObject.FindGameObjectWithTag("Player")?.transform;
+        currentState = EnemyState.Idle;
     }
 
     protected override void Update()
     {
-        if (currentState == EnemyState.Stunned) return; // ferma tutto se stunnato
+        if (currentState == EnemyState.Stunned) return; // blocco completo se stunnato
 
-        base.Update();
+        HandleState();
+    }
 
+    private void HandleState()
+    {
         switch (currentStaticState)
         {
-            case State.IdleRotate: IdleRotateUpdate(); break;
-            case State.Chase: ChaseUpdate(); break;
-            case State.ReturnHome: ReturnHomeUpdate(); break;
+            case State.IdleRotate:
+                rotationTimer += Time.deltaTime;
+                if (rotationTimer >= rotationInterval)
+                {
+                    transform.Rotate(Vector3.up, rotationAngle);
+                    rotationTimer = 0f;
+                }
+                agent.isStopped = true;
+
+                if (CanSeePlayer())
+                {
+                    currentStaticState = State.Chase;
+                    currentState = EnemyState.Chase;
+                    agent.isStopped = false;
+                    agent.SetDestination(player.position);
+                }
+                break;
+
+            case State.Chase:
+                if (CanSeePlayer())
+                {
+                    agent.SetDestination(player.position);
+                }
+                else
+                {
+                    currentStaticState = State.ReturnHome;
+                    agent.SetDestination(homePosition);
+                }
+                break;
+
+            case State.ReturnHome:
+                agent.SetDestination(homePosition);
+
+                if (!agent.pathPending && agent.remainingDistance < 0.2f)
+                {
+                    transform.position = homePosition;
+                    transform.rotation = homeRotation;
+                    currentStaticState = State.IdleRotate;
+                    currentState = EnemyState.Idle;
+                }
+                break;
         }
     }
 
-    protected override void StartChase()
+    private bool CanSeePlayer()
     {
-        currentStaticState = State.Chase;
-        base.StartChase();
-    }
-
-    void IdleRotateUpdate()
-    {
-        rotationTimer += Time.deltaTime;
-
-        if (rotationTimer >= rotationInterval)
-        {
-            transform.Rotate(Vector3.up, rotationAngle);
-            rotationTimer = 0f;
-        }
-
-        agent.isStopped = true;
-    }
-
-    void ChaseUpdate()
-    {
-        if (CanSeePlayer())
-        {
-            agent.SetDestination(player.position);
-        }
-        else
-        {
-            currentStaticState = State.ReturnHome;
-            agent.SetDestination(homePosition);
-        }
-    }
-
-    void ReturnHomeUpdate()
-    {
-        agent.SetDestination(homePosition);
-
-        if (!agent.pathPending && agent.remainingDistance < 0.2f)
-        {
-            agent.isStopped = true;
-            transform.position = homePosition;
-            transform.rotation = homeRotation;
-            currentStaticState = State.IdleRotate;
-        }
-    }
-
-    // Nuovo metodo per stun che ferma la rotazione
-    public new void ApplyStun(float duration)
-    {
-        if (currentState == EnemyState.Stunned) return;
-
-        previousStaticState = currentStaticState;
-        currentState = EnemyState.Stunned;
-        StartCoroutine(StunCoroutine(duration));
-    }
-
-    IEnumerator StunCoroutine(float duration)
-    {
-        agent.isStopped = true;
-        yield return new WaitForSeconds(duration);
-        currentState = EnemyState.Idle; // torna a Idle
-        currentStaticState = previousStaticState;
-        agent.isStopped = false;
+        if (player == null) return false;
+        return Vector3.Distance(player.position, transform.position) < 8f; // distanza semplice
     }
 }
